@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:math';
 
 import 'package:flutter/cupertino.dart';
+import 'package:shop/exceptions/http_exception.dart';
 import 'package:shop/models/product.dart';
 import 'package:http/http.dart' as http;
 
@@ -20,9 +21,9 @@ class ProductList with ChangeNotifier {
 
   Future<void> loadProducts() async {
     _items.clear();
-    
+
     final response = await http.get(Uri.parse('$_baseUrl.json'));
-    if(response.body == 'null') return;
+    if (response.body == 'null') return;
 
     Map<String, dynamic> data = jsonDecode(response.body);
     data.forEach((productId, productData) {
@@ -84,23 +85,50 @@ class ProductList with ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> updateProduct(Product product) {
+  Future<void> updateProduct(Product product) async {
     int index = _items.indexWhere((p) => p.id == product.id);
 
     if (index >= 0) {
+      await http.patch(
+        Uri.parse('$_baseUrl/${product.id}.json'),
+        body: jsonEncode(
+          {
+            'name': product.name,
+            'description': product.description,
+            'price': product.price,
+            'imageUrl': product.imageUrl,
+          },
+        ),
+      );
+
       _items[index] = product;
       notifyListeners();
     }
-
-    return Future.value();
   }
 
-  void removeProduct(Product product) {
+  Future<void> removeProduct(Product product) async {
     int index = _items.indexWhere((p) => p.id == product.id);
 
     if (index >= 0) {
-      _items.removeWhere((p) => p.id == product.id);
+      //exclui localmente
+      final product = _items[index];
+      _items.remove(product);
       notifyListeners();
+
+      //exclui no firebase
+      final response = await http.delete(
+        Uri.parse('$_baseUrl/${product.id}.json'),
+      );
+
+      //caso a exclusão no firebase falhe, ele insere o item na lista local novamente
+      if (response.statusCode >= 400) {
+        _items.insert(index, product);
+        notifyListeners();
+        throw HttpException(
+          msg: 'Não foi possível excluir o produto.',
+          statusCode: response.statusCode,
+        );
+      }
     }
   }
 }
