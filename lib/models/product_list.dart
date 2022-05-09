@@ -1,15 +1,14 @@
 import 'dart:convert';
 import 'dart:math';
 
-import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:shop/exceptions/http_exception.dart';
 import 'package:shop/models/product.dart';
-import 'package:http/http.dart' as http;
+import 'package:shop/utils/constants.dart';
 
 class ProductList with ChangeNotifier {
-  final _baseUrl =
-      'https://shop-cod3r-13bf0-default-rtdb.firebaseio.com/products';
-  final List<Product> _items = [];
+  List<Product> _items = [];
 
   List<Product> get items => [..._items];
   List<Product> get favoriteItems =>
@@ -22,9 +21,10 @@ class ProductList with ChangeNotifier {
   Future<void> loadProducts() async {
     _items.clear();
 
-    final response = await http.get(Uri.parse('$_baseUrl.json'));
+    final response = await http.get(
+      Uri.parse('${Constants.PRODUCT_BASE_URL}.json'),
+    );
     if (response.body == 'null') return;
-
     Map<String, dynamic> data = jsonDecode(response.body);
     data.forEach((productId, productData) {
       _items.add(
@@ -61,14 +61,14 @@ class ProductList with ChangeNotifier {
 
   Future<void> addProduct(Product product) async {
     final response = await http.post(
-      Uri.parse('$_baseUrl.json'),
+      Uri.parse('${Constants.PRODUCT_BASE_URL}.json'),
       body: jsonEncode(
         {
-          'name': product.name,
-          'description': product.description,
-          'price': product.price,
-          'imageUrl': product.imageUrl,
-          'isFavorite': product.isFavorite,
+          "name": product.name,
+          "description": product.description,
+          "price": product.price,
+          "imageUrl": product.imageUrl,
+          "isFavorite": product.isFavorite,
         },
       ),
     );
@@ -90,13 +90,13 @@ class ProductList with ChangeNotifier {
 
     if (index >= 0) {
       await http.patch(
-        Uri.parse('$_baseUrl/${product.id}.json'),
+        Uri.parse('${Constants.PRODUCT_BASE_URL}/${product.id}.json'),
         body: jsonEncode(
           {
-            'name': product.name,
-            'description': product.description,
-            'price': product.price,
-            'imageUrl': product.imageUrl,
+            "name": product.name,
+            "description": product.description,
+            "price": product.price,
+            "imageUrl": product.imageUrl,
           },
         ),
       );
@@ -110,17 +110,14 @@ class ProductList with ChangeNotifier {
     int index = _items.indexWhere((p) => p.id == product.id);
 
     if (index >= 0) {
-      //exclui localmente
       final product = _items[index];
       _items.remove(product);
       notifyListeners();
 
-      //exclui no firebase
       final response = await http.delete(
-        Uri.parse('$_baseUrl/${product.id}.json'),
+        Uri.parse('${Constants.PRODUCT_BASE_URL}/${product.id}.json'),
       );
 
-      //caso a exclusão no firebase falhe, ele insere o item na lista local novamente
       if (response.statusCode >= 400) {
         _items.insert(index, product);
         notifyListeners();
